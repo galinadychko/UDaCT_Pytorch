@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
+#  ipython modules/perceptron_trick.py
 
 
 import numpy as np
@@ -7,9 +8,9 @@ import os
 import sys
 from typing import Dict, Tuple, Union, List, Iterable
 
-import matplotlib.pyplot as plt
-import matplotlib
+from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib import rc
 
 from IPython import get_ipython
 from argparse import ArgumentParser
@@ -27,16 +28,16 @@ get_ipython().run_line_magic('autoreload', '2')
 # Step function, which helps us to convert each prediction score to the coresspining class labels.
 def stepFunction(x: Union[np.ndarray, float]) -> Union[np.ndarray, int]:
     """
-    Convert negative values into 0 and nonnegative into 1. 
+    Convert negative values into 0 and not negative into 1.
 
     Parameters
     ----------
-    :param x: np.ndarray OR float: input object for colnversion 
+    :param x: np.ndarray OR float: input object for conversion
     
     Returns
     --------
     np.ndarray
-              Array, where at places with negative value located 0 and otherwise - 1.
+              Array, where 0 located at places with negative value and -1 - otherwise.
     """
     if (type(x) == int) or (type(x) == float):
         return 1 - int(x < 0)
@@ -48,7 +49,7 @@ def prediction(X: np.ndarray,
                W: np.ndarray, 
                b: float) -> np.ndarray:
     """
-    For each observation with their features define the most suitable class
+    Define the most suitable class based on features of each observation
     
     Parameters
     ----------
@@ -56,7 +57,7 @@ def prediction(X: np.ndarray,
                           appropriate object and each column - to its feature
     :param W: np.ndarray: Weights of linear separator in format: 
                             np.array([A, B]),
-                          while model is described in the following way
+                          while model is described by the following way
                             Ax + By + b = 0
     :param b: float: Bias of linear separator
     
@@ -69,35 +70,35 @@ def prediction(X: np.ndarray,
     return stepFunction(pred).reshape(-1)
 
 
-def perceptronStep(X: np.ndarray, 
-                   y: np.ndarray, 
-                   W: np.ndarray, 
+def perceptronStep(X: np.ndarray,
+                   y: np.ndarray,
+                   W: np.ndarray,
                    b: float,
                    learn_rate: float) -> Tuple[np.ndarray, float]:
     """
-    Update input model`s parameters so that, 
+    Update input model`s parameters so that,
     the classification result accurasy increases
-    
+
     Parameters
     ----------
-    :param X: np.ndarray: Data matrix, where each row corresponds to the 
+    :param X: np.ndarray: Data matrix, where each row corresponds to the
                           appropriate object and each column - to its feature
-    :param y: np.ndarray: array of class labels, oreder of which corresponds 
+    :param y: np.ndarray: array of class labels, oreder of which corresponds
                           to the X matrix`s order.
                           Values should be 1 or 0.
-    :param W: np.ndarray: Weights of linear separator in format: 
+    :param W: np.ndarray: Weights of linear separator in format:
                             np.array([A, B]),
                           while model is described in the following way
                             Ax + By + b = 0
     :param b: float OR int: Bias of linear separator
-    :param learn_rate: float OR int: the  extent of weights updating
-    
+    :learn_rate: float OR int: the  extent of weights updating
+
     Returns
     ---------
     (np.ndarray, float)
                        Updated weights and bias of the input linear model
     """
-    n_obs = 1
+    n_obs, n_feat = 1, 1
     if not isinstance(W, np.ndarray):
         raise TypeError("Not correct W type")
     if len(X.shape) == 2:
@@ -106,21 +107,20 @@ def perceptronStep(X: np.ndarray,
         n_obs = len(X)
     if n_obs != len(y):
         raise ValueError("Different number of observations in X and y data")
-    
-    W = np.float64(W)    
-    b = float(b)
-    
-    y_pred = prediction(X, W, b)
-    false_prediction = np.where(y_pred != y)[0]
-    for ind in false_prediction:
-        if y[ind] == 0:
-            W -= learn_rate * X[ind, :]
-            b -= learn_rate 
-        else:
-            W += learn_rate * X[ind, :]
-            b += learn_rate
-    return W, b
 
+    W = np.float64(W)
+    b = float(b)
+
+    y_pred = prediction(X, W, b)
+    W_minus_ind = np.where((y == 0) & (y_pred != y))[0]
+    W_minus = - learn_rate * np.sum(X[W_minus_ind], axis=0)
+
+    W_plus_ind = np.where((y == 1) & (y_pred != y))[0]
+    W_plus = learn_rate * np.sum(X[W_plus_ind], axis=0)
+
+    b = b + learn_rate * (len(W_plus_ind) - len(W_minus_ind))
+
+    return W + W_minus + W_plus, b
 
 # This function runs the perceptron algorithm repeatedly on the dataset,<br/>
 # and returns a few of the boundary lines obtained in the iterations,<br/>
@@ -143,8 +143,7 @@ def trainPerceptronAlgorithm(X: np.ndarray,
     ----------
     :param X: np.ndarray: Data matrix, where each row corresponds to the 
                           appropriate object and each column - to its feature
-    :param y: np.ndarray: array of class labels, oreder of which corresponds 
-                          to the X matrix`s order.
+    :param y: np.ndarray: array of class labels, which corresponds to the X matrix`s observations.
                           Values should be 1 or 0.
     :param learn_rate: float: the  extent of weights updating
     :param num_epochs: int: number of steps for searching the most suitable parameters
@@ -173,7 +172,7 @@ def trainPerceptronAlgorithm(X: np.ndarray,
     for i in range(num_epochs):
         # In each epoch, we apply the perceptron step.
         W, b = perceptronStep(X, y, W, b, learn_rate)
-        boundary_lines.append((-W[0, 0]/W[0,1], -b/W[0, 1]))
+        boundary_lines.append((-W[0, 0]/W[0, 1], -b/W[0, 1]))
     return boundary_lines
 
 
@@ -181,7 +180,7 @@ def trainPerceptronAlgorithm(X: np.ndarray,
 def plot_separation(X_data: np.ndarray,
                     y_data: np.ndarray,
                     line_params: Dict[str, float]) -> None:
-    matplotlib.rc('axes', edgecolor='lightgray')
+    rc('axes', edgecolor='lightgray')
     fig = plt.figure(figsize=(8, 6))
 
     ax = fig.add_subplot()
@@ -206,11 +205,12 @@ def plot_separation(X_data: np.ndarray,
                        Line2D([0], [0], color="w",
                               marker="o", markerfacecolor="#5e0087", label='Class 0'),
                        Line2D([0], [0], color="w",
-                              marker="o", markerfacecolor="#FF9933", markeredgecolor="#FFCCCC", markersize=10, markeredgewidth=3, label='Missclassified')
+                              marker="o", markerfacecolor="#FF9933", markeredgecolor="#FFCCCC",
+                              markersize=10, markeredgewidth=3, label='Missclassified')
                        ]
     plt.grid(alpha=0.3)
     ax.legend(handles=legend_elements, loc='upper right', bbox_to_anchor=(1., 1.))
-    plt.title("Classification model\nbased on perceptron trick", fontdict={"size": 20})
+    plt.title("Classification model\nbased on the perceptron trick", fontdict={"size": 20})
     plt.show()
 
 
