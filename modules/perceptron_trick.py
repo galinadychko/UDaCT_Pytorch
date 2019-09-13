@@ -6,7 +6,7 @@
 import numpy as np
 import os
 import sys
-from typing import Dict, Tuple, Union, List, Iterable
+from typing import Dict, Tuple, Union, List
 
 from matplotlib import pyplot as plt
 from matplotlib.lines import Line2D
